@@ -1,0 +1,158 @@
+/*P1_S1_Q1*/
+select f.title film_title, c.name category_name, 
+	   count(r.rental_id) rental_count
+from film f
+join film_category fc
+on f.film_id = fc.film_id
+join category c
+on c.category_id = fc.category_id
+join inventory i
+on f.film_id = i.film_id
+join rental r
+on i.inventory_id = r.inventory_id
+where c.name = 'Animation' or c.name = 'Children'or 
+	  c.name =  'Classics' or c.name = 'Comedy' or 
+	  c.name =  'Family'   or c.name = 'Music'
+group by 1, 2
+order by 2, 1
+
+/*P1_S1_Q1_Extended*/
+with sub as (
+	select f.title film_title, c.name category_name, 
+		count(r.rental_id) rental_count
+		from film f
+		join film_category fc
+		on f.film_id = fc.film_id
+		join category c
+		on c.category_id = fc.category_id
+		join inventory i
+		on f.film_id = i.film_id
+		join rental r
+		on i.inventory_id = r.inventory_id
+		where c.name = 'Animation' or c.name = 'Children'or 
+			  c.name =  'Classics' or c.name =  'Comedy' or 
+			  c.name =  'Family'   or c.name = 'Music'
+		group by 1, 2
+		order by 2, 1)
+select category_name, sum(rental_count)
+from sub
+group by 1
+order by 1
+
+/*P1_S1_Q2*/
+Select f.title film_title, c.name category_name, 
+	   f.rental_duration rental_duration, 
+NTILE(4) OVER (ORDER BY rental_duration) AS standard_quartile
+from film f
+join film_category fc
+on f.film_id = fc.film_id
+join category c
+on c.category_id = fc.category_id
+where c.name = 'Animation' or c.name = 'Children' or
+	  c.name =  'Classics' or c.name = 'Comedy'   or 
+	  c.name =  'Family'   or c.name = 'Music'
+order by 4
+
+/*P1_S1_Q2_Extended*/
+with sub as(
+	Select f.title film_title, c.name category_name, 
+		   f.rental_duration rental_duration, 
+	NTILE(4) OVER (ORDER BY rental_duration) AS standard_quartile
+	from film f
+	join film_category fc
+	on f.film_id = fc.film_id
+	join category c
+	on c.category_id = fc.category_id
+	where c.name = 'Animation' or c.name = 'Children' or
+		  c.name =  'Classics' or c.name = 'Comedy'   or 
+		  c.name =  'Family'   or c.name = 'Music'
+	order by 4)
+select category_name, rental_duration, count(*)
+from sub
+group by 1, 2
+order by 1, 2
+
+/*P1_S1_Q3*/
+With sub1 as(
+	Select f.title film_title, c.name category_name, 
+		   f.rental_duration rental_duration, 
+	NTILE(4) OVER (ORDER BY rental_duration) AS standard_quartile
+	from film f
+	join film_category fc
+	on f.film_id = fc.film_id
+	join category c
+	on c.category_id = fc.category_id
+	where c.name = 'Animation' or c.name = 'Children' or 
+	      c.name =  'Classics' or c.name =  'Comedy'  or 
+		  c.name =  'Family' or c.name = 'Music'
+	order by 4
+)
+select category_name, standard_quartile, count(*)
+from sub1
+group by 1, 2
+order by 1, 2
+
+/*P1_S2_Q1*/
+select date_part('month', r.rental_date) as Rental_month,
+	   date_part('year', r.rental_date) as Rental_year, 
+	   i.store_id Store_ID, count(*) as Count_rentals
+from inventory i
+join rental r
+on i.inventory_id = r.inventory_id
+group by 1, 2, 3
+order by 4 desc
+
+/*P1_S2_Q2*/
+with top10 as (
+	select c.customer_id customer_id, 
+		  (c.first_name ||' '|| c.last_name) as full_name, 
+		  sum(p.amount) as total_payment_amount
+	from customer c
+	join payment p
+	on c.customer_id = p.customer_id
+	group by 1, 2
+	order by 3 desc
+	limit 10
+)
+select date_trunc('Month', p.payment_date) as pay_mon, 
+	   top10.full_name full_name, count(*) as pay_countpermon, 
+	   sum(p.amount) as pay_amount
+from payment p
+join top10
+on p.customer_id = top10.customer_id
+group by 1, 2
+order by 
+
+/*P1_S2_Q3*/
+with top10 as (
+	select c.customer_id customer_id, 
+		(c.first_name ||' '|| c.last_name) as full_name, 
+	sum(p.amount) as total_payment_amount
+	from customer c
+	join payment p
+	on c.customer_id = p.customer_id
+	group by 1, 2
+	order by 3 desc
+	limit 10
+),
+top10_mon_pay as (
+	select date_trunc('Month', p.payment_date) as pay_mon, 
+		top10.full_name full_name, count(*) as pay_countpermon, 
+	sum(p.amount) as pay_amount
+	from payment p
+	join top10
+	on p.customer_id = top10.customer_id
+	group by 1, 2
+	order by 2
+),
+diff_mon_pay as (
+	select pay_mon, full_name, pay_amount, 
+		lead(pay_amount) over (partition by full_name order by pay_mon) as leadPay, 
+		((lead(pay_amount) over (partition by full_name order by pay_mon)) - pay_amount) as diff_pay
+	from top10_mon_pay
+	order by 5
+)
+select pay_mon, full_name, diff_pay
+from diff_mon_pay
+where diff_pay is not NULL
+order by diff_pay desc
